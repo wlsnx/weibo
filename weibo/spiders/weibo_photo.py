@@ -34,7 +34,8 @@ class WeiboPhotoSpider(WbSpider):
     IMAGE_URL = "http://ww1.sinaimg.cn/large/{}"
     USER_HOME = "http://weibo.com/{}"
 
-    def __init__(self, uid=None, user=None):
+    def __init__(self, uid=None, user=None, *args, **kwargs):
+        super(WeiboPhotoSpider, self).__init__(*args, **kwargs)
         self.uid = set(uid.split(",")) if uid else []
         self.user = set(user.split(",")) if user else []
         #if uid or user:
