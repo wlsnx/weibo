@@ -34,6 +34,14 @@ class WeiboPhotoSpider(WbSpider):
     IMAGE_URL = "http://ww1.sinaimg.cn/large/{}"
     USER_HOME = "http://weibo.com/{}"
 
+    def __init__(self, uid=None, user=None):
+        self.uid = set(uid.split(",")) if uid else []
+        self.user = set(user.split(",")) if user else []
+        #if uid or user:
+            #self.CLOSE_ON_IDLE = False
+        #else:
+            #self.CLOSE_ON_IDLE = True
+
     def load_config(self):
         self.crawler.signals.connect(self.spider_idle, scrapy.signals.spider_idle)
         self.SCRAPE_INTERVAL = self.settings.getint("SCRAPE_INTERVAL", 60)
@@ -77,16 +85,24 @@ class WeiboPhotoSpider(WbSpider):
                                          spider=self)
 
     def get_uids(self):
+        if self.uid:
+            self.db.sadd(self.UID_KEY, *self.uid)
+            return self.uid
         return self.db.sscan(self.UID_KEY)[1]
 
     def trans_user(self):
-        while True:
-            user = self.db.rpop(self.USER_KEY)
-            if user:
-                yield scrapy.Request(self.USER_HOME.format(user),
+        #if self.user:
+        for user in self.user:
+            yield scrapy.Request(self.USER_HOME.format(user),
                                     callback=self.parse_user_home)
-            else:
-                break
+        #else:
+            #while True:
+                #user = self.db.rpop(self.USER_KEY)
+                #if user:
+                    #yield scrapy.Request(self.USER_HOME.format(user),
+                                        #callback=self.parse_user_home)
+                #else:
+                    #break
 
     def parse_user_home(self, response):
         import re
