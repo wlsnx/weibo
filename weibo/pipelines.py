@@ -25,14 +25,10 @@ class WeiboImagePipeline(ImagesPipeline):
 
     def file_path(self, request, response=None, info=None):
         path = super(WeiboImagePipeline, self).file_path(request, response, info)
-        if request.url.endswith("gif"):
-            path = path[:-3] + "gif"
         return path.replace("full/", "full/weibo_{}_".format(self.uid))
 
     def thumb_path(self, request, response=None, info=None):
         path = super(WeiboImagePipeline, self).thumb_path(request, response, info)
-        if request.url.endswith("gif"):
-            path = path[:-3] + "gif"
         return path.replace("thumb/", "thumb/weibo_{}_".format(self.uid))
 
     def get_images(self, response, request, info):
