@@ -6,8 +6,7 @@ import re
 import json
 import rsa
 import binascii
-from cookielib import LWPCookieJar
-from scrapy.http.cookies import CookieJar
+import cookielib
 from os.path import isfile
 
 
@@ -43,21 +42,29 @@ class WbSpider(scrapy.Spider):
                        "sina.com.cn"]
 
     def start_requests(self):
-        self.COOKIE_FILE = self.settings.get("COOKIE_FILE", "tmp/weibo_cookie")
+        self.COOKIE_FILE = self.settings.get("COOKIE_FILE", "/tmp/weibo_cookie")
         if isfile(self.COOKIE_FILE):
-            lwpcookiejar = LWPCookieJar(self.COOKIE_FILE)
-            self.cookiejar = CookieJar
-            for cookie in lwpcookiejar:
-                self.cookiejar.set_cookie(cookie)
-            for request in self.get_start_requests():
-                request.meta["cookiejar"] = self.cookiejar
-                yield request
+            lwpcookiejar = cookielib.LWPCookieJar(self.COOKIE_FILE)
+            lwpcookiejar.load()
+            lwpcookiejar.clear_expired_cookies()
+            lwpcookiejar.clear_session_cookies()
+            cookies = {cookie.name:cookie.value for cookie in lwpcookiejar}
+            yield scrapy.Request("http://weibo.com",
+                                 cookies=cookies,
+                                 callback=self.request_with_cookies)
+            #for request in self.get_start_requests():
+                #request.cookies = cookies
+                #yield request
 
         else:
             self.username = self.settings.get("USERNAME")
             self.password = self.settings.get("PASSWORD")
             for request in self.login():
                 yield request
+
+    def request_with_cookies(self, response):
+        for request in self.get_start_requests():
+            yield request
 
     def login(self):
         prelogin_url = "http://login.sina.com.cn/sso/prelogin.php?entry=weibo" \

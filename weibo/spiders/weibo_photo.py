@@ -51,12 +51,13 @@ class WeiboPhotoSpider(WbSpider):
                         count=str(self.COUNT))
         meta = meta or {}
         meta.update(formdata)
-        return scrapy.FormRequest(self.PHOTO_URL,
+        a =  scrapy.FormRequest(self.PHOTO_URL,
                                   callback=self.parse_photo_list,
                                   method="GET",
                                   meta=meta,
                                   dont_filter=True,
                                   formdata=formdata)
+        return a
 
     def get_start_requests(self):
         self.load_config()
