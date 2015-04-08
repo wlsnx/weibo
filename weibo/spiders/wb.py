@@ -6,6 +6,9 @@ import re
 import json
 import rsa
 import binascii
+from cookielib import LWPCookieJar
+from scrapy.http.cookies import CookieJar
+from os.path import isfile
 
 
 LOGIN_DATA = {
@@ -40,9 +43,21 @@ class WbSpider(scrapy.Spider):
                        "sina.com.cn"]
 
     def start_requests(self):
-        self.username = self.settings.get("USERNAME")
-        self.password = self.settings.get("PASSWORD")
-        return self.login()
+        self.COOKIE_FILE = self.settings.get("COOKIE_FILE", "tmp/weibo_cookie")
+        if isfile(self.COOKIE_FILE):
+            lwpcookiejar = LWPCookieJar(self.COOKIE_FILE)
+            self.cookiejar = CookieJar
+            for cookie in lwpcookiejar:
+                self.cookiejar.set_cookie(cookie)
+            for request in self.get_start_requests():
+                request.meta["cookiejar"] = self.cookiejar
+                yield request
+
+        else:
+            self.username = self.settings.get("USERNAME")
+            self.password = self.settings.get("PASSWORD")
+            for request in self.login():
+                yield request
 
     def login(self):
         prelogin_url = "http://login.sina.com.cn/sso/prelogin.php?entry=weibo" \
