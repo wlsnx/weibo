@@ -59,3 +59,8 @@ target/
 #spider settings
 settings.py
 image/
+build/
+project.egg-info/
+setup.py
+logs/
+eggs/
