@@ -91,7 +91,6 @@ class WeiboPhotoSpider(WbSpider):
     def get_uids(self):
         if self.uid:
             self.db.sadd(self.UID_KEY, *self.uid)
-            return self.uid
         return self.db.sscan(self.UID_KEY)[1]
 
     def trans_user(self):
