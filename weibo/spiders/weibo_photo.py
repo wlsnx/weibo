@@ -11,6 +11,8 @@ from weibo.items import PhotoItem
 from scrapy.exceptions import DontCloseSpider
 
 
+INF = 999999
+
 class WeiboPhotoSpider(WbSpider):
 
     name = "wp"
@@ -130,12 +132,14 @@ class WeiboPhotoSpider(WbSpider):
         image_ids = [photo["pic_name"] for photo in photo_list]
         latest_image_key = "weibo_image:{}".format(uid)
         #crawled_page_key = "weibo_page:{type}:{uid}".format(type=type, uid=uid)
+        crawl_count = meta.get("crawl_count", 0) or self.FIRST_CRAWL_COUNT
         latest_image = self.db.get(latest_image_key)
+        if latest_image:
+            crawl_count = INF
         if latest_image in image_ids:
             index = image_ids.index(latest_image)
             crawl_count = 0
         else:
-            crawl_count = meta.get("crawl_count", 0) or self.FIRST_CRAWL_COUNT
             if 0 < crawl_count <= self.COUNT:
                 index = crawl_count
                 crawl_count = 0
@@ -145,7 +149,7 @@ class WeiboPhotoSpider(WbSpider):
         image_ids = image_ids[:index]
         #crawled_page = int(self.db.get(crawled_page_key) or 1)
         #page = page + crawled_page - 1
-        crawl_done = True if crawl_count == 0 else False
+        crawl_done = True if crawl_count <= 0 else False
         if page == 1 and image_ids:
             self.db.set(latest_image_key, image_ids[0])
         #image_urls = [self.IMAGE_URL.format(photo["pic_name"]) for photo in photo_list]
