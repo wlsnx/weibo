@@ -48,7 +48,7 @@ class WbSpider(scrapy.Spider):
             lwpcookiejar.load()
             lwpcookiejar.clear_expired_cookies()
             lwpcookiejar.clear_session_cookies()
-            cookies = {cookie.name:cookie.value for cookie in lwpcookiejar}
+            cookies = {cookie.name: cookie.value for cookie in lwpcookiejar}
             yield scrapy.Request("http://weibo.com",
                                  cookies=cookies,
                                  callback=self.request_with_cookies)

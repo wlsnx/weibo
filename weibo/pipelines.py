@@ -17,8 +17,10 @@ class WeiboImagePipeline(ImagesPipeline):
     def from_settings(cls, settings):
         #cls.MAX_WIDTH = settings.getint("IMAGES_MAX_WIDTH", 10000)
         #cls.MAX_HEIGHT = settings.getint("IMAGES_MAX_HEIGHT", 10000)
-        cls.MAX_WIDTH_HEIGHT_SCALE = settings.getfloat("IMAGES_MAX_WIDTH_HEIGHT_SCALE", 0)
-        cls.MAX_HEIGHT_WIDTH_SCALE = settings.getfloat("IMAGES_MAX_HEIGHT_WIDTH_SCALE", 0)
+        cls.MAX_WIDTH_HEIGHT_SCALE = settings.getfloat(
+            "IMAGES_MAX_WIDTH_HEIGHT_SCALE", 0)
+        cls.MAX_HEIGHT_WIDTH_SCALE = settings.getfloat(
+            "IMAGES_MAX_HEIGHT_WIDTH_SCALE", 0)
         return super(WeiboImagePipeline, cls).from_settings(settings)
 
     def process_item(self, item, spider):
@@ -26,11 +28,13 @@ class WeiboImagePipeline(ImagesPipeline):
         return super(WeiboImagePipeline, self).process_item(item, spider)
 
     def file_path(self, request, response=None, info=None):
-        path = super(WeiboImagePipeline, self).file_path(request, response, info)
+        path = super(WeiboImagePipeline, self).file_path(
+            request, response, info)
         return path.replace("full/", "full/weibo_{}_".format(self.uid))
 
     def thumb_path(self, request, response=None, info=None):
-        path = super(WeiboImagePipeline, self).thumb_path(request, response, info)
+        path = super(WeiboImagePipeline, self).thumb_path(
+            request, response, info)
         return path.replace("thumb/", "thumb/weibo_{}_".format(self.uid))
 
     def get_images(self, response, request, info):
@@ -42,8 +46,8 @@ class WeiboImagePipeline(ImagesPipeline):
         #if height > width:
             #width, height = height, width
         #scale = width*1.0 / height
-        width_height_scale = width*1.0 / height
-        height_width_scale = height*1.0 / width
+        width_height_scale = width * 1.0 / height
+        height_width_scale = height * 1.0 / width
         if self.MAX_WIDTH_HEIGHT_SCALE and width_height_scale > self.MAX_WIDTH_HEIGHT_SCALE:
             raise ImageException("Image too wide (%d/%d > %.2f)" %
                                  (width, height, self.MAX_WIDTH_HEIGHT_SCALE))

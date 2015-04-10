@@ -13,6 +13,7 @@ from scrapy.exceptions import DontCloseSpider
 
 INF = 999999
 
+
 class WeiboPhotoSpider(WbSpider):
 
     name = "wp"
@@ -49,7 +50,8 @@ class WeiboPhotoSpider(WbSpider):
         from weibo import settings
         reload(settings)
         self.settings.setmodule(settings)
-        self.crawler.signals.connect(self.spider_idle, scrapy.signals.spider_idle)
+        self.crawler.signals.connect(
+            self.spider_idle, scrapy.signals.spider_idle)
         self.SCRAPE_INTERVAL = self.settings.getint("SCRAPE_INTERVAL", 60)
         self.CLOSE_ON_IDLE = self.settings.getbool("CLOSE_ON_IDLE", True)
         self.UID_KEY = self.settings.get("UID_KEY", "weibo_photo_uids")
@@ -58,7 +60,7 @@ class WeiboPhotoSpider(WbSpider):
         self.FORCE_DOWNLOAD = self.settings.getbool("FORCE_DOWNLOAD", False)
         self.FIRST_CRAWL_COUNT = self.settings.getint("FIRST_CRAWL_COUNT", 20)
         self.AUTO_UPDATE = self.settings.getbool("AUTO_UPDATE", True)
-        self.QRSYNC= self.settings.get("QRSYNC", "qrsync")
+        self.QRSYNC = self.settings.get("QRSYNC", "qrsync")
 
     def list_photo(self, uid, page, meta=None):
         formdata = dict(uid=uid,
@@ -67,12 +69,12 @@ class WeiboPhotoSpider(WbSpider):
                         count=str(self.COUNT))
         meta = meta or {}
         meta.update(formdata)
-        a =  scrapy.FormRequest(self.PHOTO_URL,
-                                  callback=self.parse_photo_list,
-                                  method="GET",
-                                  meta=meta,
-                                  dont_filter=True,
-                                  formdata=formdata)
+        a = scrapy.FormRequest(self.PHOTO_URL,
+                               callback=self.parse_photo_list,
+                               method="GET",
+                               meta=meta,
+                               dont_filter=True,
+                               formdata=formdata)
         return a
 
     def update(self, conf_path=None):
@@ -161,13 +163,14 @@ class WeiboPhotoSpider(WbSpider):
         if page == 1 and image_ids:
             self.db.set(latest_image_key, image_ids[0])
         #image_urls = [self.IMAGE_URL.format(photo["pic_name"]) for photo in photo_list]
-        image_urls = [self.IMAGE_URL.format(image_id) for image_id in image_ids]
+        image_urls = [
+            self.IMAGE_URL.format(image_id) for image_id in image_ids]
         photo_item["image_urls"] = image_urls
         photo_item["uid"] = uid
         yield photo_item
         #self.db.set(crawled_page_key, page)
-        if total > page*self.COUNT and not crawl_done:
-            yield self.list_photo(uid, page+1, meta={"crawl_count": crawl_count})
+        if total > page * self.COUNT and not crawl_done:
+            yield self.list_photo(uid, page + 1, meta={"crawl_count": crawl_count})
 
     def spider_idle(self, spider):
         if self.first_idle and self.AUTO_UPDATE:
