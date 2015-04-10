@@ -58,6 +58,7 @@ class WeiboPhotoSpider(WbSpider):
         self.FORCE_DOWNLOAD = self.settings.getbool("FORCE_DOWNLOAD", False)
         self.FIRST_CRAWL_COUNT = self.settings.getint("FIRST_CRAWL_COUNT", 20)
         self.AUTO_UPDATE = self.settings.getbool("AUTO_UPDATE", True)
+        self.QRSYNC_PATH = self.settings.get("QRSYNC", "qrsync")
 
     def list_photo(self, uid, page, meta=None):
         formdata = dict(uid=uid,
@@ -77,7 +78,7 @@ class WeiboPhotoSpider(WbSpider):
     def update(self, conf_path=None):
         import os
         if os.path.isfile("{}/qn_conf.json".format(conf_path)):
-            os.system("qrsync '{}/qn_conf.json'".format(conf_path))
+            os.system("{} '{}/qn_conf.json'".format(self.QRSYNC_PATH, conf_path))
 
     def get_start_requests(self):
         self.load_config()
