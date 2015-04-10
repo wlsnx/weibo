@@ -57,6 +57,7 @@ class WeiboPhotoSpider(WbSpider):
         self.COUNT = self.settings.getint("COUNT", 30)
         self.FORCE_DOWNLOAD = self.settings.getbool("FORCE_DOWNLOAD", False)
         self.FIRST_CRAWL_COUNT = self.settings.getint("FIRST_CRAWL_COUNT", 20)
+        self.AUTO_UPDATE = self.settings.getbool("AUTO_UPDATE", True)
 
     def list_photo(self, uid, page, meta=None):
         formdata = dict(uid=uid,
@@ -73,10 +74,16 @@ class WeiboPhotoSpider(WbSpider):
                                   formdata=formdata)
         return a
 
+    def update(self, conf_path=None):
+        import os
+        if os.path.isfile("{}/qn_conf.json".format(conf_path)):
+            os.system("qrsync '{}/qn_conf.json'".format(conf_path))
+
     def get_start_requests(self):
         self.load_config()
         reactor.callLater(self.SCRAPE_INTERVAL, self.restart)
         self.first_crawl = {}
+        self.first_idle = True
         for uid in self.get_uids():
             if not uid:
                 continue
@@ -162,6 +169,9 @@ class WeiboPhotoSpider(WbSpider):
             yield self.list_photo(uid, page+1, meta={"crawl_count": crawl_count})
 
     def spider_idle(self, spider):
+        if self.first_idle and self.AUTO_UPDATE:
+            self.update(self.settings.get("IMAGES_STORE", None))
+            self.first_idle = False
         if spider is self and not self.CLOSE_ON_IDLE:
             raise DontCloseSpider()
 
