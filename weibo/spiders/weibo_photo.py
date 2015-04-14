@@ -61,6 +61,7 @@ class WeiboPhotoSpider(WbSpider):
         self.FIRST_CRAWL_COUNT = self.settings.getint("FIRST_CRAWL_COUNT", 20)
         self.AUTO_UPDATE = self.settings.getbool("AUTO_UPDATE", True)
         self.QRSYNC = self.settings.get("QRSYNC", "qrsync")
+        scrapy.log.start_from_crawler(self.crawler)
 
     def list_photo(self, uid, page, meta=None):
         formdata = dict(uid=uid,
