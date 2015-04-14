@@ -140,7 +140,7 @@ class WeiboPhotoSpider(WbSpider):
         latest_index = self.db.get(latest_index_key)
 
         if latest_index and page == 1:
-            crawl_count = max(total - latest_index, 0)
+            crawl_count = max(total - int(latest_index), 0)
         else:
             crawl_count = meta.get("crawl_count", 0) or self.FIRST_CRAWL_COUNT
         if page == 1:
