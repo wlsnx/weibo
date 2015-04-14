@@ -11,9 +11,6 @@ from weibo.items import PhotoItem
 from scrapy.exceptions import DontCloseSpider
 
 
-INF = 999999
-
-
 class WeiboPhotoSpider(WbSpider):
 
     name = "wp"
@@ -57,9 +54,8 @@ class WeiboPhotoSpider(WbSpider):
         self.UID_KEY = self.settings.get("UID_KEY", "weibo_photo_uids")
         self.USER_KEY = self.settings.get("USER_KEY", "weibo_photo_users")
         self.COUNT = self.settings.getint("COUNT", 30)
-        self.FORCE_DOWNLOAD = self.settings.getbool("FORCE_DOWNLOAD", False)
         self.FIRST_CRAWL_COUNT = self.settings.getint("FIRST_CRAWL_COUNT", 20)
-        self.AUTO_UPDATE = self.settings.getbool("AUTO_UPDATE", True)
+        self.AUTO_UPDATE = self.settings.getbool("AUTO_UPDATE", False)
         self.QRSYNC = self.settings.get("QRSYNC", "qrsync")
         scrapy.log.start_from_crawler(self.crawler)
 
@@ -135,41 +131,31 @@ class WeiboPhotoSpider(WbSpider):
         meta = response.meta
         uid = meta["uid"]
         page = int(meta["page"])
-        #type = meta["type"]
         data = data_json["data"]
         total = data.get("total", 0)
         photo_list = data.get("photo_list", [])
         photo_item = PhotoItem()
         image_ids = [photo["pic_name"] for photo in photo_list]
-        latest_image_key = "weibo_image:{}".format(uid)
-        #crawled_page_key = "weibo_page:{type}:{uid}".format(type=type, uid=uid)
-        crawl_count = meta.get("crawl_count", 0) or self.FIRST_CRAWL_COUNT
-        latest_image = self.db.get(latest_image_key)
-        if latest_image:
-            crawl_count = INF
-        if latest_image in image_ids:
-            index = image_ids.index(latest_image)
-            crawl_count = 0
+        latest_index_key = "weibo_index:{}".format(uid)
+        latest_index = self.db.get(latest_index_key)
+
+        if latest_index and page == 1:
+            crawl_count = max(total - latest_index, 0)
         else:
-            if 0 < crawl_count <= self.COUNT:
-                index = crawl_count
-                crawl_count = 0
-            elif crawl_count > self.COUNT:
-                index = self.COUNT
-                crawl_count -= self.COUNT
-        image_ids = image_ids[:index]
-        #crawled_page = int(self.db.get(crawled_page_key) or 1)
-        #page = page + crawled_page - 1
-        crawl_done = True if crawl_count <= 0 else False
-        if page == 1 and image_ids:
-            self.db.set(latest_image_key, image_ids[0])
-        #image_urls = [self.IMAGE_URL.format(photo["pic_name"]) for photo in photo_list]
+            crawl_count = meta.get("crawl_count", 0) or self.FIRST_CRAWL_COUNT
+        if page == 1:
+            self.db.set(latest_index_key, total)
+
+        image_ids = image_ids[:min(crawl_count, self.COUNT)]
+        crawl_count = max(crawl_count - self.COUNT, 0)
+
+        crawl_done = True if crawl_count == 0 else False
         image_urls = [
             self.IMAGE_URL.format(image_id) for image_id in image_ids]
         photo_item["image_urls"] = image_urls
         photo_item["uid"] = uid
         yield photo_item
-        #self.db.set(crawled_page_key, page)
+
         if total > page * self.COUNT and not crawl_done:
             yield self.list_photo(uid, page + 1, meta={"crawl_count": crawl_count})
 
