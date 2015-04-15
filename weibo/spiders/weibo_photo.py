@@ -34,10 +34,11 @@ class WeiboPhotoSpider(WbSpider):
     IMAGE_URL = "http://ww1.sinaimg.cn/large/{}"
     USER_HOME = "http://weibo.com/{}"
 
-    def __init__(self, uid=None, user=None, *args, **kwargs):
+    def __init__(self, uid=None, user=None, action="start", *args, **kwargs):
         super(WeiboPhotoSpider, self).__init__(*args, **kwargs)
         self.uid = set(uid.split(",")) if uid else []
         self.user = set(user.split(",")) if user else []
+        self.action = action
         #if uid or user:
             #self.CLOSE_ON_IDLE = False
         #else:
@@ -74,23 +75,25 @@ class WeiboPhotoSpider(WbSpider):
                                formdata=formdata)
         return a
 
-    def update(self, conf_path=None):
+    def update(self, conf_path=""):
         import os
-        if os.path.isfile("{}/qn_conf.json".format(conf_path)):
-            os.system("{} '{}/qn_conf.json'".format(self.QRSYNC, conf_path))
+        qn_conf = os.path.join(conf_path, "qn_conf.json")
+        if os.path.isfile(qn_conf):
+            os.system("{} '{}'".format(self.QRSYNC, qn_conf))
 
     def get_start_requests(self):
         self.load_config()
         reactor.callLater(self.SCRAPE_INTERVAL, self.restart)
-        self.first_crawl = {}
+        #self.first_crawl = {}
         self.first_idle = True
+
+        for request in self.trans_user():
+            yield request
+
         for uid in self.get_uids():
             if not uid:
                 continue
             yield self.list_photo(uid, 1)
-
-        for request in self.trans_user():
-            yield request
 
     def restart(self):
         for request in self.get_start_requests():
@@ -99,7 +102,10 @@ class WeiboPhotoSpider(WbSpider):
 
     def get_uids(self):
         if self.uid:
-            self.db.sadd(self.UID_KEY, *self.uid)
+            if self.action == "start":
+                self.db.sadd(self.UID_KEY, *self.uid)
+            elif self.action == "stop":
+                self.db.srem(self.UID_KEY, *self.uid)
         return self.db.sscan(self.UID_KEY)[1]
 
     def trans_user(self):
@@ -122,9 +128,12 @@ class WeiboPhotoSpider(WbSpider):
         matched = uid_pattern.search(response.body)
         if matched:
             uid = matched.group(1)
-            new_uid = self.db.sadd(self.UID_KEY, uid)
-            if new_uid:
-                yield self.list_photo(uid, 1)
+            if self.action == "start":
+                new_uid = self.db.sadd(self.UID_KEY, uid)
+                if new_uid:
+                    yield self.list_photo(uid, 1)
+            elif self.action == "stop":
+                self.db.srem(self.UID_KEY, uid)
 
     def parse_photo_list(self, response):
         data_json = json.loads(response.body)
@@ -161,7 +170,7 @@ class WeiboPhotoSpider(WbSpider):
 
     def spider_idle(self, spider):
         if self.first_idle and self.AUTO_UPDATE:
-            self.update(self.settings.get("IMAGES_STORE", None))
+            self.update(self.settings.get("IMAGES_STORE", ""))
             self.first_idle = False
         if spider is self and not self.CLOSE_ON_IDLE:
             raise DontCloseSpider()
