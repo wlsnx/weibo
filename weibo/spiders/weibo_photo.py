@@ -39,10 +39,6 @@ class WeiboPhotoSpider(WbSpider):
         self.uid = set(uid.split(",")) if uid else []
         self.user = set(user.split(",")) if user else []
         self.action = action
-        #if uid or user:
-            #self.CLOSE_ON_IDLE = False
-        #else:
-            #self.CLOSE_ON_IDLE = True
 
     def load_config(self):
         from weibo import settings
@@ -58,7 +54,7 @@ class WeiboPhotoSpider(WbSpider):
         self.FIRST_CRAWL_COUNT = self.settings.getint("FIRST_CRAWL_COUNT", 20)
         self.AUTO_UPDATE = self.settings.getbool("AUTO_UPDATE", False)
         self.QRSYNC = self.settings.get("QRSYNC", "qrsync")
-        scrapy.log.start_from_crawler(self.crawler)
+        # scrapy.log.start_from_crawler(self.crawler)
 
     def list_photo(self, uid, page, meta=None):
         formdata = dict(uid=uid,
@@ -96,7 +92,7 @@ class WeiboPhotoSpider(WbSpider):
             yield self.list_photo(uid, 1)
 
     def restart(self):
-        for request in self.get_start_requests():
+        for request in self.start_requests():
             self.crawler.engine.schedule(request=request,
                                          spider=self)
 
@@ -109,18 +105,9 @@ class WeiboPhotoSpider(WbSpider):
         return self.db.sscan(self.UID_KEY)[1]
 
     def trans_user(self):
-        #if self.user:
         for user in self.user:
             yield scrapy.Request(self.USER_HOME.format(user),
-                                    callback=self.parse_user_home)
-        #else:
-            #while True:
-                #user = self.db.rpop(self.USER_KEY)
-                #if user:
-                    #yield scrapy.Request(self.USER_HOME.format(user),
-                                        #callback=self.parse_user_home)
-                #else:
-                    #break
+                                 callback=self.parse_user_home)
 
     def parse_user_home(self, response):
         import re
@@ -174,4 +161,3 @@ class WeiboPhotoSpider(WbSpider):
             self.first_idle = False
         if spider is self and not self.CLOSE_ON_IDLE:
             raise DontCloseSpider()
-

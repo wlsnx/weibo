@@ -6,7 +6,6 @@ import re
 import json
 import rsa
 import binascii
-import cookielib
 from os.path import isfile
 
 
@@ -42,19 +41,14 @@ class WbSpider(scrapy.Spider):
                        "sina.com.cn"]
 
     def start_requests(self):
-        self.COOKIE_FILE = self.settings.get("COOKIE_FILE", "/tmp/weibo_cookie")
+        import pudb; pudb.set_trace()  # XXX BREAKPOINT
+        self.COOKIE_FILE = self.settings.get(
+            "COOKIE_FILE", "/tmp/weibo_cookie")
         if isfile(self.COOKIE_FILE):
-            lwpcookiejar = cookielib.LWPCookieJar(self.COOKIE_FILE)
-            lwpcookiejar.load()
-            lwpcookiejar.clear_expired_cookies()
-            lwpcookiejar.clear_session_cookies()
-            cookies = {cookie.name: cookie.value for cookie in lwpcookiejar}
-            yield scrapy.Request("http://weibo.com",
-                                 cookies=cookies,
-                                 callback=self.request_with_cookies)
-            #for request in self.get_start_requests():
-                #request.cookies = cookies
-                #yield request
+            cookies = json.load(open(self.COOKIE_FILE))
+            for request in self.get_start_requests():
+                request.cookies = cookies
+                yield request
 
         else:
             self.username = self.settings.get("USERNAME")
@@ -62,16 +56,14 @@ class WbSpider(scrapy.Spider):
             for request in self.login():
                 yield request
 
-    def request_with_cookies(self, response):
-        for request in self.get_start_requests():
-            yield request
-
-    def login(self):
+    def login(self, pin=False):
         prelogin_url = "http://login.sina.com.cn/sso/prelogin.php?entry=weibo" \
-                        "&callback=sinaSSOController.preloginCallBack&su={}" \
-                        "&rsakt=mod&checkpin=1&client=ssologin.js(v1.4.11)" \
-                        .format(self.get_user(self.username))
+            "&callback=sinaSSOController.preloginCallBack&su={}" \
+            "&rsakt=mod&checkpin=1&client=ssologin.js(v1.4.11)" \
+            .format(self.get_user(self.username))
         yield scrapy.Request(prelogin_url,
+                             meta={"pin": pin},
+                             dont_filter=True,
                              callback=self.parse_prelogin)
 
     @staticmethod
@@ -81,6 +73,7 @@ class WbSpider(scrapy.Spider):
         return _username
 
     def parse_prelogin(self, response):
+        meta = response.meta
         login_data = LOGIN_DATA.copy()
         p = re.compile("\((.*)\)")
         matched = p.search(response.body)
@@ -95,25 +88,68 @@ class WbSpider(scrapy.Spider):
         login_data["su"] = self.get_user(self.username)
         login_data["sp"] = self.get_pwd_rsa(self.password, servertime, nonce)
         login_data["rsakv"] = rsakv
+        if meta.get("pin", False):
+            pcid = data["pcid"]
+            login_data["pcid"] = pcid
+            import random
+            pin = "http://login.sina.com.cn/cgi/pin.php?r={}&s=0&p={}".format(
+                random.randint(10000000, 99999999), pcid)
+            yield scrapy.Request(pin,
+                                 meta={"login_data": login_data},
+                                 dont_filter=True,
+                                 callback=self.parse_pin)
+        else:
+            yield scrapy.FormRequest(LOGIN_URL,
+                                     formdata=login_data,
+                                     dont_filter=True,
+                                     callback=self.parse_login)
+
+    def parse_pin(self, response):
+        login_data = response.meta["login_data"]
+        WEIBO_PIN_PATH = self.settings.get(
+            "WEIBO_PIN_PATH", "/tmp/weibo_pin.png")
+        with open(WEIBO_PIN_PATH, "wb") as weibo_pin:
+            weibo_pin.write(response.body)
+        # sync
+        from select import select
+        import sys
+        print(u"请输入验证码:")
+        rlist, _, _ = select([sys.stdin], [], [], 60)
+        if rlist:
+            door = sys.stdin.readline().replace("\n", "").replace("\r", "")
+        else:
+            sys.exit(1)
+        login_data["door"] = door
         yield scrapy.FormRequest(LOGIN_URL,
                                  formdata=login_data,
+                                 dont_filter=True,
                                  callback=self.parse_login)
 
     def parse_login(self, response):
         p = re.compile("location.replace\(['|\"](.*?)['|\"]\)")
         matched = p.search(response.body)
-        assert matched
-        login_url = matched.group(1)
-        yield scrapy.Request(login_url,
-                             callback=self.parse_redirect)
+        if matched:
+            login_url = matched.group(1)
+            if "retcode=0" in login_url:
+                return scrapy.Request(login_url,
+                                      callback=self.parse_redirect)
+            else:
+                return self.login(pin=True)
+        else:
+            return self.login(pin=True)
 
     def parse_redirect(self, response):
         p = re.compile("feedBackUrlCallBack\((.*)\)", re.M)
         matched = p.search(response.body)
-        assert matched
         feedback_json = json.loads(matched.group(1))
         assert feedback_json["result"]
+        self.save_cookie(response)
         return self.origin_start_requests()
+
+    def save_cookie(self, response):
+        cookie = response.request.headers["Cookie"]
+        cookie_dict = dict([c.split("=") for c in cookie.split(";")])
+        json.dump(cookie_dict, open(self.COOKIE_FILE, "w"))
 
     def origin_start_requests(self):
         from itertools import chain
@@ -132,7 +168,5 @@ class WbSpider(scrapy.Spider):
         encropy_pwd = rsa.encrypt(message, key)
         return binascii.b2a_hex(encropy_pwd)
 
-
     def parse(self, response):
         pass
-
