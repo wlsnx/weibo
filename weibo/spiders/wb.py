@@ -6,7 +6,8 @@ import re
 import json
 import rsa
 import binascii
-from os.path import isfile
+#from os.path import isfile
+import cookielib
 
 
 LOGIN_DATA = {
@@ -41,16 +42,24 @@ class WbSpider(scrapy.Spider):
                        "sina.com.cn"]
 
     def start_requests(self):
-        import pudb; pudb.set_trace()  # XXX BREAKPOINT
         self.COOKIE_FILE = self.settings.get(
             "COOKIE_FILE", "/tmp/weibo_cookie")
-        if isfile(self.COOKIE_FILE):
-            cookies = json.load(open(self.COOKIE_FILE))
+        try:
+            lwpcookiejar = cookielib.LWPCookieJar(self.COOKIE_FILE)
+            lwpcookiejar.load(ignore_discard=True, ignore_expires=True)
+            for middleware in self.crawler.engine.downloader.middleware.middlewares:
+                if isinstance(middleware, scrapy.contrib.downloadermiddleware.cookies.CookiesMiddleware):
+                    cookies_middleware = middleware
+                    break
+            else:
+                raise KeyError()
+            cookiejar = cookies_middleware.jars[None].jar
+            for cookie in lwpcookiejar:
+                cookiejar.set_cookie(cookie)
             for request in self.get_start_requests():
-                request.cookies = cookies
                 yield request
 
-        else:
+        except:
             self.username = self.settings.get("USERNAME")
             self.password = self.settings.get("PASSWORD")
             for request in self.login():
@@ -146,10 +155,17 @@ class WbSpider(scrapy.Spider):
         self.save_cookie(response)
         return self.origin_start_requests()
 
-    def save_cookie(self, response):
-        cookie = response.request.headers["Cookie"]
-        cookie_dict = dict([c.split("=") for c in cookie.split(";")])
-        json.dump(cookie_dict, open(self.COOKIE_FILE, "w"))
+    def save_cookie(self, response=None):
+        lwpcookiejar = cookielib.LWPCookieJar(self.COOKIE_FILE)
+        for middleware in self.crawler.engine.downloader.middleware.middlewares:
+            if isinstance(middleware, scrapy.contrib.downloadermiddleware.cookies.CookiesMiddleware):
+                cookies_middleware = middleware
+                break
+        else:
+            return
+        for cookie in cookies_middleware.jars[None].jar:
+            lwpcookiejar.set_cookie(cookie)
+        lwpcookiejar.save(ignore_discard=True, ignore_expires=True)
 
     def origin_start_requests(self):
         from itertools import chain
