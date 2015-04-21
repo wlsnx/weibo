@@ -9,6 +9,8 @@ from twisted.internet import reactor
 import json
 from weibo.items import PhotoItem
 from scrapy.exceptions import DontCloseSpider
+#from scrapy.contrib.loader import ItemLoader
+from weibo.items import PhotoItemLoader as ItemLoader
 
 
 class WeiboPhotoSpider(WbSpider):
@@ -130,8 +132,8 @@ class WeiboPhotoSpider(WbSpider):
         data = data_json["data"]
         total = data.get("total", 0)
         photo_list = data.get("photo_list", [])
-        photo_item = PhotoItem()
-        image_ids = [photo["pic_name"] for photo in photo_list]
+        #photo_item = PhotoItem()
+        #image_ids = [photo["pic_name"] for photo in photo_list]
         latest_index_key = "weibo_index:{}".format(uid)
         latest_index = self.db.get(latest_index_key)
 
@@ -142,15 +144,25 @@ class WeiboPhotoSpider(WbSpider):
         if page == 1:
             self.db.set(latest_index_key, total)
 
-        image_ids = image_ids[:min(crawl_count, self.COUNT)]
+        #image_ids = image_ids[:min(crawl_count, self.COUNT)]
+        photo_list = photo_list[:min(crawl_count, self.COUNT)]
         crawl_count = max(crawl_count - self.COUNT, 0)
 
         crawl_done = True if crawl_count == 0 else False
-        image_urls = [
-            self.IMAGE_URL.format(image_id) for image_id in image_ids]
-        photo_item["image_urls"] = image_urls
-        photo_item["uid"] = uid
-        yield photo_item
+        #image_urls = [
+            #self.IMAGE_URL.format(image_id) for image_id in image_ids]
+        #photo_item["image_urls"] = image_urls
+        #photo_item["uid"] = uid
+        #yield photo_item
+        for photo in photo_list:
+            photo_item = ItemLoader(PhotoItem())
+            photo_item.add_value("image_urls", [[self.IMAGE_URL.format(photo["pic_name"]),],])
+            photo_item.add_value("caption", photo["caption_render"])
+            photo_item.add_value("created_time", photo["timestamp"])
+            photo_item.add_value("code", photo["pic_pid"])
+            #photo_item.add_value("ins_id", photo["uid"])
+            photo_item.add_value("uid", photo["uid"])
+            yield photo_item.load_item()
 
         if total > page * self.COUNT and not crawl_done:
             yield self.list_photo(uid, page + 1, meta={"crawl_count": crawl_count})
