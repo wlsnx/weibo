@@ -52,17 +52,17 @@ class WeiboPhotoSpider(WbSpider):
         self.CLOSE_ON_IDLE = self.settings.getbool("CLOSE_ON_IDLE", True)
         self.UID_KEY = self.settings.get("UID_KEY", "weibo_photo_uids")
         self.USER_KEY = self.settings.get("USER_KEY", "weibo_photo_users")
-        self.COUNT = self.settings.getint("COUNT", 30)
+        #self.COUNT = self.settings.getint("COUNT", 30)
         self.FIRST_CRAWL_COUNT = self.settings.getint("FIRST_CRAWL_COUNT", 20)
         self.AUTO_UPDATE = self.settings.getbool("AUTO_UPDATE", False)
         self.QRSYNC = self.settings.get("QRSYNC", "qrsync")
         # scrapy.log.start_from_crawler(self.crawler)
 
-    def list_photo(self, uid, page, meta=None):
+    def list_photo(self, uid, page, crawl_count=0, meta=None):
         formdata = dict(uid=uid,
                         page=str(page),
                         type="3",
-                        count=str(self.COUNT))
+                        count=str(crawl_count) if crawl_count else str(self.FIRST_CRAWL_COUNT))
         meta = meta or {}
         meta.update(formdata)
         a = scrapy.FormRequest(self.PHOTO_URL,
@@ -128,7 +128,7 @@ class WeiboPhotoSpider(WbSpider):
         data_json = json.loads(response.body)
         meta = response.meta
         uid = meta["uid"]
-        page = int(meta["page"])
+        #page = int(meta["page"])
         data = data_json["data"]
         total = data.get("total", 0)
         photo_list = data.get("photo_list", [])
@@ -136,36 +136,49 @@ class WeiboPhotoSpider(WbSpider):
         #image_ids = [photo["pic_name"] for photo in photo_list]
         latest_index_key = "weibo_index:{}".format(uid)
         latest_index = self.db.get(latest_index_key)
+        #self.db.set(latest_index_key, total - self.COUNT * (page - 1))
 
-        if latest_index and page == 1:
-            crawl_count = max(total - int(latest_index), 0)
-        else:
-            crawl_count = meta.get("crawl_count", 0) or self.FIRST_CRAWL_COUNT
-        if page == 1:
-            self.db.set(latest_index_key, total)
+        new_photo_count = max(total - int(latest_index), 0) if latest_index else self.FIRST_CRAWL_COUNT
+        if not new_photo_count:
+            yield
+        elif new_photo_count > len(photo_list):
+            yield self.list_photo(uid, 1, new_photo_count)
+
+        #if latest_index and page == 1:
+            #crawl_count = max(total - int(latest_index), 0)
+        #else:
+            #crawl_count = meta.get("crawl_count", 0) or self.FIRST_CRAWL_COUNT
+        #if page == 1:
+            #self.db.set(latest_index_key, total)
+
+        #crawl_count = max(total - int(latest_index), 0) % self.COUNT if latest_index else self.COUNT
 
         #image_ids = image_ids[:min(crawl_count, self.COUNT)]
-        photo_list = photo_list[:min(crawl_count, self.COUNT)]
-        crawl_count = max(crawl_count - self.COUNT, 0)
+        #photo_list = photo_list[crawl_count:0:-1]
+        else:
+            self.db.set(latest_index_key, total)
+            #photo_list.reverse()
+            photo_list = photo_list[new_photo_count-1::-1]
+        #crawl_count = max(crawl_count - self.COUNT, 0)
 
-        crawl_done = True if crawl_count == 0 else False
+        #crawl_done = True if crawl_count == 0 else False
         #image_urls = [
             #self.IMAGE_URL.format(image_id) for image_id in image_ids]
         #photo_item["image_urls"] = image_urls
         #photo_item["uid"] = uid
         #yield photo_item
-        for photo in photo_list:
-            photo_item = ItemLoader(PhotoItem())
-            photo_item.add_value("image_urls", [[self.IMAGE_URL.format(photo["pic_name"]),],])
-            photo_item.add_value("caption", photo["caption_render"])
-            photo_item.add_value("created_time", photo["timestamp"])
-            photo_item.add_value("code", photo["pic_pid"])
-            #photo_item.add_value("ins_id", photo["uid"])
-            photo_item.add_value("uid", photo["uid"])
-            yield photo_item.load_item()
+            for photo in photo_list:
+                photo_item = ItemLoader(PhotoItem())
+                photo_item.add_value("image_urls", [[self.IMAGE_URL.format(photo["pic_name"]),],])
+                photo_item.add_value("caption", photo["caption_render"])
+                photo_item.add_value("created_time", photo["timestamp"])
+                photo_item.add_value("code", photo["pic_pid"])
+                #photo_item.add_value("ins_id", photo["uid"])
+                photo_item.add_value("uid", photo["uid"])
+                yield photo_item.load_item()
 
-        if total > page * self.COUNT and not crawl_done:
-            yield self.list_photo(uid, page + 1, meta={"crawl_count": crawl_count})
+        #if total > page * self.COUNT and crawl_count:
+            #yield self.list_photo(uid, page + 1, crawl_count=crawl_count)
 
     def spider_idle(self, spider):
         if self.first_idle and self.AUTO_UPDATE:

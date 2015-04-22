@@ -30,12 +30,32 @@ class WeiboImagePipeline(ImagesPipeline):
     def file_path(self, request, response=None, info=None):
         path = super(WeiboImagePipeline, self).file_path(
             request, response, info)
+        url = request.url
+        path = path[:path.rfind(".")] + url[url.rfind("."):]
         return path.replace("full/", "full/weibo_{}_".format(self.uid))
 
     def thumb_path(self, request, response=None, info=None):
         path = super(WeiboImagePipeline, self).thumb_path(
             request, response, info)
+        url = request.url
+        path = path[:path.rfind(".")] + url[url.rfind("."):]
         return path.replace("thumb/", "thumb/weibo_{}_".format(self.uid))
+
+    def image_downloaded(self, response, request, info):
+        check_sum = None
+        for path, image, buf in self.get_images(response, request, info):
+            if check_sum is None:
+                buf.seek(0)
+                from scrapy.utils.misc import md5sum
+                check_sum = md5sum(buf)
+            width, height = image.size
+            buf = BytesIO(response.body)
+            self.store.persist_file(
+                path, buf, info,
+                meta={"width": width,
+                      "height": height},
+            )
+        return check_sum
 
     def get_images(self, response, request, info):
         orig_image = Image.open(BytesIO(response.body))
