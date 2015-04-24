@@ -139,6 +139,7 @@ class WeiboPhotoSpider(WbSpider):
         #self.db.set(latest_index_key, total - self.COUNT * (page - 1))
 
         new_photo_count = max(total - int(latest_index), 0) if latest_index else self.FIRST_CRAWL_COUNT
+        new_photo_count = min(new_photo_count, total)
         if not new_photo_count:
             yield
         elif new_photo_count > len(photo_list):
