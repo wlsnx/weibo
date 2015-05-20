@@ -26,6 +26,8 @@ class WeiboPhotoSpider(WbSpider):
     #PHOTO_URL = "http://photo.weibo.com/photos/get_{}"
     #PHOTO_TYPES = ("all")
 
+    tasks = []
+
     #ALBUM_URL = "http://photo.weibo.com/albums/get_{}"
     """
     LATEST FORM PARAMS:
@@ -78,6 +80,7 @@ class WeiboPhotoSpider(WbSpider):
         qn_conf = os.path.join(conf_path, "qn_conf.json")
         if os.path.isfile(qn_conf):
             os.system("{} '{}'".format(self.QRSYNC, qn_conf))
+        self.do_rest_tasks()
 
     def get_start_requests(self):
         self.load_config()
@@ -173,6 +176,7 @@ class WeiboPhotoSpider(WbSpider):
                 photo_item.add_value("image_urls", [[self.IMAGE_URL.format(photo["pic_name"]),],])
                 photo_item.add_value("caption", photo["caption_render"])
                 photo_item.add_value("created_time", photo["timestamp"])
+                photo_item.add_value("timestamp", photo["timestamp"])
                 photo_item.add_value("code", photo["pic_pid"])
                 #photo_item.add_value("ins_id", photo["uid"])
                 photo_item.add_value("uid", photo["uid"])
@@ -187,3 +191,17 @@ class WeiboPhotoSpider(WbSpider):
             self.first_idle = False
         if spider is self and not self.CLOSE_ON_IDLE:
             raise DontCloseSpider()
+
+    def do_rest_tasks(self):
+        import requests
+        import copy
+        ytapi_url = self.settings.get("YTAPI_URL")
+        self.tasks.sort(key=lambda x: x[1])
+        tasks = copy.copy(self.tasks)
+        self.tasks = []
+        for task in tasks:
+            print(task[1])
+            response = requests.post(ytapi_url, data=task[0])
+            if "post_result" not in response.content:
+                self.tasks.append(task)
+

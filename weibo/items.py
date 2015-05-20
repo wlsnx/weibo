@@ -33,10 +33,11 @@ def strftime(timestamp):
 class PhotoItem(scrapy.Item):
 
     caption      = scrapy.Field()
-    created_time = scrapy.Field(input_processor=MapCompose(strftime))
+    created_time = scrapy.Field(input_processor = MapCompose(strftime))
     img_std_url  = scrapy.Field()
     code         = scrapy.Field()
     image_urls   = scrapy.Field()
+    timestamp    = scrapy.Field()
     images       = scrapy.Field()
     uid          = scrapy.Field()
 
