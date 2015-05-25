@@ -45,9 +45,9 @@ class WeiboPhotoSpider(WbSpider):
         self.action = action
 
     def load_config(self):
-        from weibo import settings
-        reload(settings)
-        self.settings.setmodule(settings)
+        #from weibo import settings
+        #reload(settings)
+        #self.settings.setmodule(settings)
         self.crawler.signals.connect(
             self.spider_idle, scrapy.signals.spider_idle)
         self.SCRAPE_INTERVAL = self.settings.getint("SCRAPE_INTERVAL", 60)
