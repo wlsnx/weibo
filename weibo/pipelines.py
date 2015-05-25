@@ -23,9 +23,9 @@ class WeiboImagePipeline(ImagesPipeline):
             "IMAGES_MAX_HEIGHT_WIDTH_SCALE", 0)
         return super(WeiboImagePipeline, cls).from_settings(settings)
 
-    def process_item(self, item, spider):
-        self.uid = item["uid"]
-        return super(WeiboImagePipeline, self).process_item(item, spider)
+    #def process_item(self, item, spider):
+        #self.uid = item["uid"]
+        #return super(WeiboImagePipeline, self).process_item(item, spider)
 
     def file_path(self, request, response=None, info=None):
         path = super(WeiboImagePipeline, self).file_path(
@@ -39,7 +39,8 @@ class WeiboImagePipeline(ImagesPipeline):
             request, response, info)
         url = request.url
         path = path[:path.rfind(".")] + url[url.rfind("."):]
-        return path.replace("thumb/", "thumb/weibo_{}_".format(self.uid))
+        uid = response.meta["uid"]
+        return path.replace("thumb/", "thumb/weibo_{}_".format(uid))
 
     def image_downloaded(self, response, request, info):
         check_sum = None
