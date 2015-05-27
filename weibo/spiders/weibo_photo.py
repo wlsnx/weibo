@@ -128,7 +128,12 @@ class WeiboPhotoSpider(WbSpider):
                 self.db.srem(self.UID_KEY, uid)
 
     def parse_photo_list(self, response):
-        data_json = json.loads(response.body)
+        try:
+            data_json = json.loads(response.body)
+        except ValueError:
+            import os
+            os.remove(self.COOKIE_FILE)
+            self.close()
         meta = response.meta
         uid = meta["uid"]
         #page = int(meta["page"])
@@ -204,4 +209,7 @@ class WeiboPhotoSpider(WbSpider):
             response = requests.post(ytapi_url, data=task[0])
             if "post_result" not in response.content:
                 self.tasks.append(task)
+
+    def close(self, reason="cancelled"):
+        return self.crawler.engine.close_spider(self, reason)
 
