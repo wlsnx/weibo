@@ -200,7 +200,7 @@ class WeiboPhotoSpider(WbSpider):
         import copy
         ytapi_url = self.settings.get("YTAPI_URL")
         self.tasks.sort(key=lambda x: x[1])
-        tasks = copy.copy(self.tasks)
+        tasks = reversed(copy.copy(self.tasks))
         self.tasks = []
         for task in tasks:
             print(task[1])
