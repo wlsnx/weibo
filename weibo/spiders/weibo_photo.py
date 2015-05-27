@@ -131,8 +131,6 @@ class WeiboPhotoSpider(WbSpider):
         try:
             data_json = json.loads(response.body)
         except ValueError:
-            import os
-            os.remove(self.COOKIE_FILE)
             self.close()
         meta = response.meta
         uid = meta["uid"]
@@ -212,4 +210,9 @@ class WeiboPhotoSpider(WbSpider):
 
     def close(self, reason="cancelled"):
         return self.crawler.engine.close_spider(self, reason)
+
+    def closed(self, reason):
+        import os
+        if os.path.isfile(self.COOKIE_FILE):
+            os.remove(self.COOKIE_FILE)
 
