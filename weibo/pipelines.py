@@ -9,6 +9,7 @@
 from scrapy.contrib.pipeline.images import ImagesPipeline, ImageException
 from io import BytesIO
 from PIL import Image
+from scrapy import Request
 
 
 class WeiboImagePipeline(ImagesPipeline):
@@ -32,14 +33,15 @@ class WeiboImagePipeline(ImagesPipeline):
             request, response, info)
         url = request.url
         path = path[:path.rfind(".")] + url[url.rfind("."):]
-        return path.replace("full/", "full/weibo_{}_".format(self.uid))
+        uid = request.meta["uid"]
+        return path.replace("full/", "full/weibo_{}_".format(uid))
 
     def thumb_path(self, request, response=None, info=None):
         path = super(WeiboImagePipeline, self).thumb_path(
             request, response, info)
         url = request.url
         path = path[:path.rfind(".")] + url[url.rfind("."):]
-        uid = response.meta["uid"]
+        uid = request.meta["uid"]
         return path.replace("thumb/", "thumb/weibo_{}_".format(uid))
 
     def image_downloaded(self, response, request, info):
@@ -57,6 +59,9 @@ class WeiboImagePipeline(ImagesPipeline):
                       "height": height},
             )
         return check_sum
+
+    def get_media_requests(self, item, info):
+        return [Request(x, meta={"uid": item["uid"]}) for x in item.get(self.IMAGES_URLS_FIELD, [])]
 
     def get_images(self, response, request, info):
         orig_image = Image.open(BytesIO(response.body))
