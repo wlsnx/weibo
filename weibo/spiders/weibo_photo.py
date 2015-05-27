@@ -76,11 +76,11 @@ class WeiboPhotoSpider(WbSpider):
         return a
 
     def update(self, conf_path=""):
+        self.do_rest_tasks()
         import os
         qn_conf = os.path.join(conf_path, "qn_conf.json")
         if os.path.isfile(qn_conf):
             os.system("{} '{}'".format(self.QRSYNC, qn_conf))
-        self.do_rest_tasks()
 
     def get_start_requests(self):
         self.load_config()
