@@ -8,6 +8,10 @@ import rsa
 import binascii
 #from os.path import isfile
 import cookielib
+try:
+    from scrapy.downloadermiddlewares.cookies import CookiesMiddleware
+except ImportError:
+    from scrapy.contrib.downloadermiddleware.cookies import CookiesMiddleware
 
 
 LOGIN_DATA = {
@@ -48,7 +52,7 @@ class WbSpider(scrapy.Spider):
             lwpcookiejar = cookielib.LWPCookieJar(self.COOKIE_FILE)
             lwpcookiejar.load(ignore_discard=True, ignore_expires=True)
             for middleware in self.crawler.engine.downloader.middleware.middlewares:
-                if isinstance(middleware, scrapy.contrib.downloadermiddleware.cookies.CookiesMiddleware):
+                if isinstance(middleware, CookiesMiddleware):
                     cookies_middleware = middleware
                     break
             else:
@@ -158,7 +162,7 @@ class WbSpider(scrapy.Spider):
     def save_cookie(self, response=None):
         lwpcookiejar = cookielib.LWPCookieJar(self.COOKIE_FILE)
         for middleware in self.crawler.engine.downloader.middleware.middlewares:
-            if isinstance(middleware, scrapy.contrib.downloadermiddleware.cookies.CookiesMiddleware):
+            if isinstance(middleware, CookiesMiddleware):
                 cookies_middleware = middleware
                 break
         else:

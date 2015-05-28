@@ -6,7 +6,10 @@
 # See: http://doc.scrapy.org/en/latest/topics/item-pipeline.html
 
 
-from scrapy.contrib.pipeline.images import ImagesPipeline, ImageException
+try:
+    from scrapy.pipelines.images import ImagesPipeline, ImageException
+except ImportError:
+    from scrapy.contrib.pipeline.images import ImagesPipeline, ImageException
 from io import BytesIO
 from PIL import Image
 from scrapy import Request

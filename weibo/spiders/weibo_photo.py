@@ -59,21 +59,35 @@ class WeiboPhotoSpider(WbSpider):
         self.AUTO_UPDATE = self.settings.getbool("AUTO_UPDATE", False)
         self.QRSYNC = self.settings.get("QRSYNC", "qrsync")
         # scrapy.log.start_from_crawler(self.crawler)
+        self.MAX_CRAWL_COUNT = self.settings.getint("MAX_CRAWL_COUNT", 100)
 
-    def list_photo(self, uid, page, crawl_count=0, meta=None):
-        formdata = dict(uid=uid,
-                        page=str(page),
-                        type="3",
-                        count=str(crawl_count) if crawl_count else str(self.FIRST_CRAWL_COUNT))
-        meta = meta or {}
-        meta.update(formdata)
-        a = scrapy.FormRequest(self.PHOTO_URL,
-                               callback=self.parse_photo_list,
-                               method="GET",
-                               meta=meta,
-                               dont_filter=True,
-                               formdata=formdata)
-        return a
+    def list_photo(self, uid, crawl_count=None, page=1, meta=None):
+        if crawl_count is None:
+            crawl_count = self.FIRST_CRAWL_COUNT
+        if crawl_count > self.MAX_CRAWL_COUNT:
+            for page in range(1, crawl_count / self.MAX_CRAWL_COUNT + 1):
+                for request in  self.list_photo(uid, self.MAX_CRAWL_COUNT, page,
+                                                meta={"new_photo_count": self.MAX_CRAWL_COUNT}):
+                    yield request
+            new_photo_count = crawl_count % self.MAX_CRAWL_COUNT
+            if new_photo_count:
+                for request in  self.list_photo(uid, self.MAX_CRAWL_COUNT, page,
+                                                meta={"new_photo_count": new_photo_count}):
+                    yield request
+        else:
+            formdata = dict(uid=uid,
+                            page=str(page),
+                            type="3",
+                            count=str(crawl_count))
+            meta = meta or {}
+            meta.update(formdata)
+            request = scrapy.FormRequest(self.PHOTO_URL,
+                                         callback=self.parse_photo_list,
+                                         method="GET",
+                                         meta=meta,
+                                         dont_filter=True,
+                                         formdata=formdata)
+            yield request
 
     def update(self, conf_path=""):
         self.do_rest_tasks()
@@ -94,7 +108,8 @@ class WeiboPhotoSpider(WbSpider):
         for uid in self.get_uids():
             if not uid:
                 continue
-            yield self.list_photo(uid, 1)
+            for request in self.list_photo(uid):
+                yield request
 
     def restart(self):
         for request in self.start_requests():
@@ -123,7 +138,8 @@ class WeiboPhotoSpider(WbSpider):
             if self.action == "start":
                 new_uid = self.db.sadd(self.UID_KEY, uid)
                 if new_uid:
-                    yield self.list_photo(uid, 1)
+                    for request in  self.list_photo(uid):
+                        yield request
             elif self.action == "stop":
                 self.db.srem(self.UID_KEY, uid)
 
@@ -131,7 +147,7 @@ class WeiboPhotoSpider(WbSpider):
         try:
             data_json = json.loads(response.body)
         except ValueError:
-            self.close()
+            self.crawler.engine.close_spider(self)
         meta = response.meta
         uid = meta["uid"]
         #page = int(meta["page"])
@@ -144,12 +160,27 @@ class WeiboPhotoSpider(WbSpider):
         latest_index = self.db.get(latest_index_key)
         #self.db.set(latest_index_key, total - self.COUNT * (page - 1))
 
-        new_photo_count = max(total - int(latest_index), 0) if latest_index else self.FIRST_CRAWL_COUNT
+        if "new_photo_count" in meta:
+            new_photo_count = meta["new_photo_count"]
+        elif latest_index:
+            new_photo_count = max(total - int(latest_index), 0)
+        else:
+            new_photo_count = self.FIRST_CRAWL_COUNT
+        #new_photo_count = max(total - int(latest_index), 0) if latest_index else self.FIRST_CRAWL_COUNT
         new_photo_count = min(new_photo_count, total)
         if not new_photo_count:
             yield
+        #elif new_photo_count > self.MAX_CRAWL_COUNT:
+            #for page in range(1, new_photo_count / self.MAX_CRAWL_COUNT + 1):
+                #if new_photo_count >= self.MAX_CRAWL_COUNT * page:
+                    #for request in self.list_photo(uid, self.MAX_CRAWL_COUNT, page):
+                        #yield request
+                #else:
+                    #for request in self.list_photo(uid, self.MAX_CRAWL_COUNT, page):
+                        #yield request
         elif new_photo_count > len(photo_list):
-            yield self.list_photo(uid, 1, new_photo_count)
+            for request in  self.list_photo(uid, new_photo_count):
+                yield request
 
         #if latest_index and page == 1:
             #crawl_count = max(total - int(latest_index), 0)
@@ -186,7 +217,7 @@ class WeiboPhotoSpider(WbSpider):
                 yield photo_item.load_item()
 
         #if total > page * self.COUNT and crawl_count:
-            #yield self.list_photo(uid, page + 1, crawl_count=crawl_count)
+            #yield self.list_photo(uid, crawl_count=crawl_count, page + 1)
 
     def spider_idle(self, spider):
         if self.first_idle and self.AUTO_UPDATE:
@@ -207,9 +238,6 @@ class WeiboPhotoSpider(WbSpider):
             response = requests.post(ytapi_url, data=task[0])
             if "post_result" not in response.content:
                 self.tasks.append(task)
-
-    def close(self, reason="cancelled"):
-        return self.crawler.engine.close_spider(self, reason)
 
     def closed(self, reason):
         import os

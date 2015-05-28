@@ -6,8 +6,12 @@
 # http://doc.scrapy.org/en/latest/topics/items.html
 
 import scrapy
-from scrapy.contrib.loader.processor import MapCompose, TakeFirst
-from scrapy.contrib.loader import ItemLoader
+try:
+    from scrapy.loader.processors import MapCompose, TakeFirst
+    from scrapy.loader import ItemLoader
+except ImportError:
+    from scrapy.contrib.loader.processor import MapCompose, TakeFirst
+    from scrapy.contrib.loader import ItemLoader
 
 
 class DefaultItem(scrapy.Item):
