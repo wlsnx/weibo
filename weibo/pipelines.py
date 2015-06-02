@@ -25,7 +25,19 @@ class WeiboImagePipeline(ImagesPipeline):
             "IMAGES_MAX_WIDTH_HEIGHT_SCALE", 0)
         cls.MAX_HEIGHT_WIDTH_SCALE = settings.getfloat(
             "IMAGES_MAX_HEIGHT_WIDTH_SCALE", 0)
+        #cls.MAX_WIDTH = settings.getint("IMAGES_MAX_WIDTH", 0)
+        #cls.MAX_HEIGHT = settings.getint("IMAGES_MAX_HEIGHT", 0)
+        cls.IMAGES_MAX_WIDTH = settings.getint("IMAGES_MAX_WIDTH", 0)
+        cls.IMAGES_MAX_HEIGHT = settings.getint("IMAGES_MAX_HEIGHT", 0)
+        cls.IMAGES_RESIZE = settings.getlist("IMAGES_RESIZE")
         return super(WeiboImagePipeline, cls).from_settings(settings)
+
+    def resize(self, width, height):
+        if not self.IMAGES_RESIZE:
+            return False
+        elif self.IMAGES_MAX_WIDTH is not 0 and width > self.IMAGES_MAX_WIDTH \
+            or self.IMAGES_MAX_HEIGHT is not 0 and height > self.IMAGES_MAX_HEIGHT:
+            return True
 
     #def process_item(self, item, spider):
         #self.uid = item["uid"]
@@ -55,7 +67,8 @@ class WeiboImagePipeline(ImagesPipeline):
                 from scrapy.utils.misc import md5sum
                 check_sum = md5sum(buf)
             width, height = image.size
-            buf = BytesIO(response.body)
+            if response.url.endswith(".gif"):
+                buf = BytesIO(response.body)
             self.store.persist_file(
                 path, buf, info,
                 meta={"width": width,
@@ -67,6 +80,7 @@ class WeiboImagePipeline(ImagesPipeline):
         return [Request(x, meta={"uid": item["uid"]}) for x in item.get(self.IMAGES_URLS_FIELD, [])]
 
     def get_images(self, response, request, info):
+        path = self.file_path(request, response=response, info=info)
         orig_image = Image.open(BytesIO(response.body))
         width, height = orig_image.size
         #if width > self.MAX_WIDTH or height > self.MAX_HEIGHT:
@@ -83,6 +97,10 @@ class WeiboImagePipeline(ImagesPipeline):
         elif self.MAX_HEIGHT_WIDTH_SCALE and height_width_scale > self.MAX_HEIGHT_WIDTH_SCALE:
             raise ImageException("Image too high (%d/%d > %.2f)" %
                                  (height, width, self.MAX_HEIGHT_WIDTH_SCALE))
+        elif self.resize(width, height):
+            image, buf = self.convert_image(orig_image, self.IMAGES_RESIZE)
+            yield path, image, buf
         else:
-            return super(WeiboImagePipeline, self).get_images(response, request, info)
+            for info in super(WeiboImagePipeline, self).get_images(response, request, info):
+                yield info
 
