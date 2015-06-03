@@ -13,6 +13,7 @@ except ImportError:
 from io import BytesIO
 from PIL import Image
 from scrapy import Request
+import six
 
 
 class WeiboImagePipeline(ImagesPipeline):
@@ -59,22 +60,22 @@ class WeiboImagePipeline(ImagesPipeline):
         uid = request.meta["uid"]
         return path.replace("thumb/", "thumb/weibo_{}_".format(uid))
 
-    def image_downloaded(self, response, request, info):
-        check_sum = None
-        for path, image, buf in self.get_images(response, request, info):
-            if check_sum is None:
-                buf.seek(0)
-                from scrapy.utils.misc import md5sum
-                check_sum = md5sum(buf)
-            width, height = image.size
-            if response.url.endswith(".gif"):
-                buf = BytesIO(response.body)
-            self.store.persist_file(
-                path, buf, info,
-                meta={"width": width,
-                      "height": height},
-            )
-        return check_sum
+    #def image_downloaded(self, response, request, info):
+        #check_sum = None
+        #for path, image, buf in self.get_images(response, request, info):
+            #if check_sum is None:
+                #buf.seek(0)
+                #from scrapy.utils.misc import md5sum
+                #check_sum = md5sum(buf)
+            #width, height = image.size
+            #if response.url.endswith(".gif"):
+                #buf = BytesIO(response.body)
+            #self.store.persist_file(
+                #path, buf, info,
+                #meta={"width": width,
+                      #"height": height},
+            #)
+        #return check_sum
 
     def get_media_requests(self, item, info):
         return [Request(x, meta={"uid": item["uid"]}) for x in item.get(self.IMAGES_URLS_FIELD, [])]
@@ -83,24 +84,36 @@ class WeiboImagePipeline(ImagesPipeline):
         path = self.file_path(request, response=response, info=info)
         orig_image = Image.open(BytesIO(response.body))
         width, height = orig_image.size
-        #if width > self.MAX_WIDTH or height > self.MAX_HEIGHT:
-            #raise ImageException("Image too big (%dx%d > %dx%d)" %
-                                 #(width, height, self.MAX_WIDTH, self.MAX_HEIGHT))
-        #if height > width:
-            #width, height = height, width
-        #scale = width*1.0 / height
+
         width_height_scale = width * 1.0 / height
         height_width_scale = height * 1.0 / width
+
         if self.MAX_WIDTH_HEIGHT_SCALE and width_height_scale > self.MAX_WIDTH_HEIGHT_SCALE:
             raise ImageException("Image too wide (%d/%d > %.2f)" %
                                  (width, height, self.MAX_WIDTH_HEIGHT_SCALE))
-        elif self.MAX_HEIGHT_WIDTH_SCALE and height_width_scale > self.MAX_HEIGHT_WIDTH_SCALE:
+
+        if self.MAX_HEIGHT_WIDTH_SCALE and height_width_scale > self.MAX_HEIGHT_WIDTH_SCALE:
             raise ImageException("Image too high (%d/%d > %.2f)" %
                                  (height, width, self.MAX_HEIGHT_WIDTH_SCALE))
+
+        if width < self.MIN_WIDTH or height < self.MIN_HEIGHT:
+            raise ImageException("Image too small (%dx%d < %dx%d)" %
+                                 (width, height, self.MIN_WIDTH, self.MIN_HEIGHT))
+
+        if orig_image.format == "GIF":
+            buf = BytesIO(response.body)
+            yield path, orig_image, buf
+
         elif self.resize(width, height):
             image, buf = self.convert_image(orig_image, self.IMAGES_RESIZE)
             yield path, image, buf
+
         else:
-            for info in super(WeiboImagePipeline, self).get_images(response, request, info):
-                yield info
+            image, buf = self.convert_image(orig_image)
+            yield path, image, buf
+
+        for thumb_id, size in six.iteritems(self.THUMBS):
+            thumb_path = self.thumb_path(request, thumb_id, response=response, info=info)
+            thumb_image, thumb_buf = self.convert_image(image, size)
+            yield thumb_path, thumb_image, thumb_buf
 
