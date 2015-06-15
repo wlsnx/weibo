@@ -144,10 +144,10 @@ class WeiboPhotoSpider(WbSpider):
                 self.db.srem(self.UID_KEY, uid)
 
     def parse_photo_list(self, response):
-        try:
-            data_json = json.loads(response.body)
-        except ValueError:
+        if "passport" in response.url:
             self.crawler.engine.close_spider(self)
+            raise StopIteration
+        data_json = json.loads(response.body)
         meta = response.meta
         uid = meta["uid"]
         #page = int(meta["page"])
