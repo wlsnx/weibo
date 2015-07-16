@@ -2,7 +2,7 @@
 # encoding: utf-8
 
 
-from wb import WbSpider
+from .wb import WbSpider
 import scrapy
 import redis
 from twisted.internet import reactor
@@ -122,7 +122,7 @@ class WeiboPhotoSpider(WbSpider):
                 self.db.sadd(self.UID_KEY, *self.uid)
             elif self.action == "stop":
                 self.db.srem(self.UID_KEY, *self.uid)
-        return self.db.sscan(self.UID_KEY)[1]
+        return self.db.smembers(self.UID_KEY)
 
     def trans_user(self):
         for user in self.user:

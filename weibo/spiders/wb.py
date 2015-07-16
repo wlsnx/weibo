@@ -7,7 +7,10 @@ import json
 import rsa
 import binascii
 #from os.path import isfile
-import cookielib
+try:
+    import cookielib
+except ImportError:
+    import http.cookiejar as cookielib
 try:
     from scrapy.downloadermiddlewares.cookies import CookiesMiddleware
 except ImportError:
